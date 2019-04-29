@@ -9,6 +9,9 @@ const store = require('../store')
 const dev = process.env.NODE_ENV === 'development'
 const winId = e => e.sender.webContents.browserWindowOptions.id
 const windows = {}
+
+const DEFAULT_URL = 'https://soundcloud.com'
+
 let tray
 
 let hideShow = { current: false, running: false, next: false }
@@ -20,8 +23,21 @@ let reloadTimeout, resetTimeout
 const api = {
   create: () => {
     const webPreferences = { nodeIntegration: false, contextIsolation: true, preload: path.resolve(__dirname, '../../bundle/bridge.js') }
-    windows.tray = new BrowserWindow({ id: 'tray', width: 360, frame: false, transparent: true, hasShadow: false, show: false, alwaysOnTop: true, backgroundThrottling: false, webPreferences, icon: path.join(__dirname, './AppIcon.png') })
-    windows.tray.loadURL(`file://${__dirname}/../../bundle/tray.html`)
+    let windowConfig = {
+      id: 'tray',
+      width: 360,
+      frame: false,
+      transparent: true,
+      hasShadow: false,
+      show: false,
+      alwaysOnTop: true,
+      backgroundThrottling: false,
+      webPreferences,
+      icon: path.join(__dirname, './AppIcon.png')
+    }
+    windows.tray = new BrowserWindow(windowConfig)
+    //windows.tray.loadURL(`file://${__dirname}/../../bundle/tray.html`)
+    windows.tray.loadURL(DEFAULT_URL)
     windows.tray.on('closed', () => delete windows.tray)
     windows.tray.webContents.on('will-navigate', e => e.preventDefault()) // Prevent navigation
     windows.tray.webContents.on('will-attach-webview', e => e.preventDefault()) // Prevent attaching <webview>
@@ -85,6 +101,10 @@ const api = {
     api.create()
   },
   trayClick: () => {
+    let showing = hideShow.current ? hideShow.current === 'showing' : windows.tray.isVisible()
+    showing ? api.hideTray() : api.showTray()
+  },
+  toggleTray: () => {
     let showing = hideShow.current ? hideShow.current === 'showing' : windows.tray.isVisible()
     showing ? api.hideTray() : api.showTray()
   },

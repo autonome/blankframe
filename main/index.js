@@ -1,14 +1,12 @@
-const { app, ipcMain, protocol, shell, dialog } = require('electron')
+const { app, ipcMain, protocol, shell, dialog, globalShortcut, Menu, MenuItem } = require('electron')
 const PersistStore = require('electron-store')
 const log = require('electron-log')
 const path = require('path')
 
 const store = require('./store')
 const launch = require('./launch')
-const signers = require('./signers')
 const windows = require('./windows')
 const updater = require('./updater')
-require('./rpc')
 
 log.info('Chrome: v' + process.versions.chrome)
 log.info('Electron: v' + process.versions.electron)
@@ -27,11 +25,6 @@ process.on('uncaughtException', (e) => {
 const persist = new PersistStore()
 
 const externalWhitelist = [
-  'https://frame.sh',
-  'https://chrome.google.com/webstore/detail/frame-alpha/ldcoohedfbjoobcadoglnnmmfbdlmmhf',
-  'https://github.com/floating/frame/issues/new',
-  'https://gitter.im/framehq/general',
-  'https://github.com/floating/frame/blob/master/LICENSE'
 ]
 
 global.eval = () => { throw new Error(`This app does not support global.eval()`) } // eslint-disable-line
@@ -45,19 +38,6 @@ ipcMain.on('tray:resetAllSettings', () => {
 
 ipcMain.on('tray:installAvailableUpdate', (e, install) => {
   updater.installAvailableUpdate(install)
-})
-
-ipcMain.on('tray:verifyAddress', (e) => {
-  signers.verifyAddress(true)
-})
-
-ipcMain.on('tray:openExternal', (e, url) => {
-  if (externalWhitelist.indexOf(url) > -1) shell.openExternal(url)
-})
-
-ipcMain.on('tray:giveAccess', (e, req, access) => {
-  store.giveAccess(req, access)
-  signers.removeRequest(req.handlerId)
 })
 
 ipcMain.on('tray:syncPath', (e, path, value) => {
@@ -85,6 +65,18 @@ app.on('ready', () => {
     let filePath = path.resolve(__dirname, req.url.replace(process.platform === 'win32' ? 'file:///' : 'file://', ''))
     if (filePath.startsWith(appOrigin)) cb({path: filePath}) // eslint-disable-line
   })
+  globalShortcut.register('CommandOrControl+Shift+E', function(){
+    windows.toggleTray()
+  })
+
+  /*
+  const menu = new Menu()
+  menu.append(new MenuItem({
+      label: 'Close',
+      accelerator: 'Esc',
+      click: () => { console.log('escape!') }
+  }))
+  */
 })
 
 ipcMain.on('tray:action', (e, action, ...args) => {
@@ -94,7 +86,6 @@ ipcMain.on('tray:action', (e, action, ...args) => {
 
 app.on('activate', () => windows.activate())
 app.on('will-quit', () => app.quit())
-app.on('quit', signers.close)
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
 
 let launchStatus = store('main.launch')
@@ -106,3 +97,4 @@ store.observer(() => {
 })
 
 store.observer(_ => persist.set('main', store('main')))
+
